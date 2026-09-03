@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>FR.io - Ultima Responsive Edition</title>
+    <title>FR.io - TC Edition</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; touch-action: none; }
         body, html { width: 100%; height: 100%; overflow: hidden; background: #0c0f1d; font-family: 'Segoe UI', Arial, sans-serif; position: fixed; }
         canvas { display: block; width: 100vw; height: 100vh; position: absolute; top:0; left:0; z-index: 1; }
 
-        /* 大廳介面 */
         #lobby {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(12, 15, 29, 0.92); backdrop-filter: blur(10px);
@@ -33,7 +32,6 @@
             color: white; font-weight: bold; font-size: 18px; cursor: pointer; margin-top: 5px;
         }
 
-        /* Top 5 排行榜 */
         #leaderboard {
             position: absolute; top: 12px; right: 12px; z-index: 5;
             background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.1);
@@ -45,7 +43,6 @@
         #leaderboard li { font-size: 12px; font-weight: 600; display: flex; justify-content: space-between; margin-bottom: 3px; color: #ddd; }
         #leaderboard li.me { color: #ffeb3b; }
 
-        /* 手機專用虛擬控制器 */
         #joystick-zone { position: absolute; bottom: 25px; left: 25px; width: 110px; height: 110px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); touch-action: none; z-index: 5; }
         #joystick-knob { position: absolute; top: 32.5px; left: 32.5px; width: 45px; height: 45px; border-radius: 50%; background: rgba(255,255,255,0.4); pointer-events: none; }
         #mobile-controls { position: absolute; bottom: 25px; right: 25px; display: flex; gap: 12px; z-index: 5; }
@@ -81,7 +78,6 @@
 
     <canvas id="gameCanvas"></canvas>
 
-    <!-- 行動端操作 -->
     <div id="joystick-zone"><div id="joystick-knob"></div></div>
     <div id="mobile-controls">
         <div class="act-btn" id="btn-w">W</div>
@@ -89,14 +85,12 @@
     </div>
 
 <script>
-// --- [1. 防手勢縮放與捲動] ---
 document.addEventListener('gesturestart', e => e.preventDefault());
 document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
 
 const GAME_SIG = "FR_IO_SECURE_AUTH_2026";
 const WORLD_SIZE = 4000;
 
-// --- [2. 高清 Canvas 與棋盤格紋理] ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 let dpr = window.devicePixelRatio || 1;
@@ -105,16 +99,10 @@ let gridPattern = null;
 function initGridPattern() {
     const pCanvas = document.createElement('canvas');
     const gridSize = 60;
-    pCanvas.width = gridSize;
-    pCanvas.height = gridSize;
+    pCanvas.width = gridSize; pCanvas.height = gridSize;
     const pCtx = pCanvas.getContext('2d');
-
-    pCtx.fillStyle = '#0c0f1d';
-    pCtx.fillRect(0, 0, gridSize, gridSize);
-    pCtx.strokeStyle = '#181d36';
-    pCtx.lineWidth = 2;
-    pCtx.strokeRect(0, 0, gridSize, gridSize);
-
+    pCtx.fillStyle = '#0c0f1d'; pCtx.fillRect(0, 0, gridSize, gridSize);
+    pCtx.strokeStyle = '#181d36'; pCtx.lineWidth = 2; pCtx.strokeRect(0, 0, gridSize, gridSize);
     gridPattern = ctx.createPattern(pCanvas, 'repeat');
 }
 
@@ -127,12 +115,11 @@ function resizeCanvas() {
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
-// --- [3. 遊戲狀態與 P2P] ---
 let peer, conn, isHost = false;
 let myName = "無名玩家";
 let myId = 'peer_' + Math.random().toString(36).substring(2, 9);
 
-let gameState = { players: {}, foods: [] };
+let gameState = { players: {}, foods: [], viruses: [], ejected: [] };
 let localInput = { angle: 0, speed: 0, split: false, eject: false };
 
 function startGame() {
@@ -141,7 +128,6 @@ function startGame() {
     document.getElementById('lobby').style.display = 'none';
 
     peer = new Peer(myId);
-
     peer.on('open', () => {
         conn = peer.connect(serverId, { metadata: { signature: GAME_SIG }, reliable: false });
         conn.on('open', () => setupClientConn(conn));
@@ -158,12 +144,14 @@ function becomeHost(roomId) {
     peer = new Peer(roomId);
 
     for (let i = 0; i < 350; i++) gameState.foods.push(createFood());
+    for (let i = 0; i < 15; i++) gameState.viruses.push(createVirus());
     gameState.players[myId] = createPlayer(myId, myName);
 
     peer.on('connection', (c) => {
         if (!c.metadata || c.metadata.signature !== GAME_SIG) { c.close(); return; }
 
         c.on('data', (data) => {
+            if (gameState.players[c.peer]) gameState.players[c.peer].lastSeen = Date.now();
             if (data.type === 'JOIN') gameState.players[c.peer] = createPlayer(c.peer, data.name);
             if (data.type === 'INPUT' && gameState.players[c.peer]) {
                 gameState.players[c.peer].input = data.input;
@@ -188,7 +176,8 @@ function createPlayer(id, name) {
         x: Math.random() * (WORLD_SIZE - 200) + 100,
         y: Math.random() * (WORLD_SIZE - 200) + 100,
         mass: 20, color: `hsl(${Math.random() * 360}, 80%, 55%)`,
-        input: { angle: 0, speed: 0 }
+        input: { angle: 0, speed: 0, split: false, eject: false },
+        lastSeen: Date.now()
     };
 }
 
@@ -196,10 +185,38 @@ function createFood() {
     return { x: Math.random() * WORLD_SIZE, y: Math.random() * WORLD_SIZE, color: `hsl(${Math.random() * 360}, 85%, 60%)` };
 }
 
+function createVirus() {
+    return { x: Math.random() * (WORLD_SIZE - 300) + 150, y: Math.random() * (WORLD_SIZE - 300) + 150, radius: 42, mass: 100 };
+}
+
 function updateHostLogic() {
-    Object.keys(gameState.players).forEach(id => {
-        let p = gameState.players[id];
-        let input = (id === myId) ? localInput : p.input;
+    const now = Date.now();
+    let playerList = Object.values(gameState.players);
+
+    // 清除超過 3 秒離線的幽靈玩家
+    Object.keys(gameState.players).forEach(pId => {
+        if (pId !== myId && now - gameState.players[pId].lastSeen > 3000) {
+            delete gameState.players[pId];
+        }
+    });
+
+    playerList.forEach(p => {
+        let input = (p.id === myId) ? localInput : p.input;
+
+        // W 吐質機制
+        if (input.eject && p.mass >= 35) {
+            p.mass -= 13;
+            let r = Math.sqrt(p.mass) * 8;
+            gameState.ejected.push({
+                x: p.x + Math.cos(input.angle) * (r + 15),
+                y: p.y + Math.sin(input.angle) * (r + 15),
+                angle: input.angle,
+                speed: 12,
+                mass: 10,
+                color: p.color
+            });
+            input.eject = false;
+        }
 
         let radius = Math.sqrt(p.mass) * 8;
         let speed = Math.max(1.8, 7.5 - (radius * 0.035)) * (input.speed || 0);
@@ -210,6 +227,7 @@ function updateHostLogic() {
         p.x = Math.max(radius, Math.min(WORLD_SIZE - radius, p.x));
         p.y = Math.max(radius, Math.min(WORLD_SIZE - radius, p.y));
 
+        // 吞噬食物與噴出質量塊
         for (let i = gameState.foods.length - 1; i >= 0; i--) {
             let f = gameState.foods[i];
             if (Math.hypot(p.x - f.x, p.y - f.y) < radius) {
@@ -217,8 +235,44 @@ function updateHostLogic() {
                 gameState.foods[i] = createFood();
             }
         }
+        for (let i = gameState.ejected.length - 1; i >= 0; i--) {
+            let e = gameState.ejected[i];
+            if (Math.hypot(p.x - e.x, p.y - e.y) < radius) {
+                p.mass += e.mass;
+                gameState.ejected.splice(i, 1);
+            }
+        }
     });
 
+    // 動態更新吐質小球飛行狀態
+    gameState.ejected.forEach(e => {
+        if (e.speed > 0) {
+            e.x += Math.cos(e.angle) * e.speed;
+            e.y += Math.sin(e.angle) * e.speed;
+            e.speed *= 0.88;
+        }
+    });
+
+    // 玩家互吃判定 (大於對方 20 點質量)
+    for (let i = 0; i < playerList.length; i++) {
+        for (let j = 0; j < playerList.length; j++) {
+            if (i === j) continue;
+            let p1 = playerList[i];
+            let p2 = playerList[j];
+
+            if (p1.mass >= p2.mass + 20) {
+                let r1 = Math.sqrt(p1.mass) * 8;
+                if (Math.hypot(p1.x - p2.x, p1.y - p2.y) < r1 - 8) {
+                    p1.mass += p2.mass;
+                    p2.mass = 20;
+                    p2.x = Math.random() * (WORLD_SIZE - 200) + 100;
+                    p2.y = Math.random() * (WORLD_SIZE - 200) + 100;
+                }
+            }
+        }
+    }
+
+    // 廣播最新世界狀態
     if (peer && peer.connections) {
         Object.keys(peer.connections).forEach(pId => {
             if (peer.connections[pId][0] && peer.connections[pId][0].open) {
@@ -228,7 +282,6 @@ function updateHostLogic() {
     }
 }
 
-// --- [4. 渲染與優化版排行榜] ---
 function updateLeaderboard() {
     const listEl = document.getElementById('rank-list');
     const sorted = Object.values(gameState.players).sort((a, b) => b.mass - a.mass).slice(0, 5);
@@ -255,12 +308,27 @@ function render() {
         ctx.strokeStyle = '#ff0055'; ctx.lineWidth = 8;
         ctx.strokeRect(0, 0, WORLD_SIZE, WORLD_SIZE);
 
+        // 食物與吐質小球 (底層)
         gameState.foods.forEach(f => {
             ctx.fillStyle = f.color;
             ctx.beginPath(); ctx.arc(f.x, f.y, 4, 0, Math.PI * 2); ctx.fill();
         });
+        gameState.ejected.forEach(e => {
+            ctx.fillStyle = e.color;
+            ctx.beginPath(); ctx.arc(e.x, e.y, 8, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+        });
 
-        Object.values(gameState.players).forEach(p => {
+        // 刺球 (中層)
+        gameState.viruses.forEach(v => {
+            ctx.fillStyle = '#33ff33';
+            ctx.beginPath(); ctx.arc(v.x, v.y, v.radius, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#22cc22'; ctx.lineWidth = 4; ctx.stroke();
+        });
+
+        // 玩家排序（質量小先畫，大球壓在上層）
+        const sortedPlayers = Object.values(gameState.players).sort((a, b) => a.mass - b.mass);
+        sortedPlayers.forEach(p => {
             let r = Math.sqrt(p.mass) * 8;
 
             ctx.fillStyle = p.color;
@@ -281,12 +349,18 @@ function render() {
 }
 requestAnimationFrame(render);
 
-// --- [5. 鍵盤 + 手機觸控輸入綁定] ---
+// 輸入操控綁定
 window.addEventListener('mousemove', (e) => {
     let centerX = window.innerWidth / 2;
     let centerY = window.innerHeight / 2;
     localInput.angle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
     localInput.speed = 1;
+    sendInput();
+});
+
+window.addEventListener('keydown', (e) => {
+    if (e.code === 'KeyW') localInput.eject = true;
+    if (e.code === 'Space') localInput.split = true;
     sendInput();
 });
 
