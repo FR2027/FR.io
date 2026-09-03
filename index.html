@@ -2,58 +2,60 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>FR.io - Ultima Edition</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>FR.io - Ultima Responsive Edition</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background: #0c0f1d; font-family: 'Segoe UI', Arial, sans-serif; }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; touch-action: none; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #0c0f1d; font-family: 'Segoe UI', Arial, sans-serif; position: fixed; }
         canvas { display: block; width: 100vw; height: 100vh; position: absolute; top:0; left:0; z-index: 1; }
 
-        /* 登入大廳 UI */
+        /* 大廳介面 */
         #lobby {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(12, 15, 29, 0.9); backdrop-filter: blur(10px);
+            background: rgba(12, 15, 29, 0.92); backdrop-filter: blur(10px);
             display: flex; justify-content: center; align-items: center; z-index: 10; color: white;
         }
         .panel {
             background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15);
-            padding: 30px; border-radius: 16px; width: 340px; text-align: center;
+            padding: 25px; border-radius: 16px; width: 90%; max-width: 340px; text-align: center;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
-        .panel h1 { font-size: 36px; margin-bottom: 20px; color: #00f2fe; text-shadow: 0 0 10px rgba(0,242,254,0.5); }
-        .input-group { margin-bottom: 15px; text-align: left; }
-        .input-group label { display: block; font-size: 12px; margin-bottom: 5px; color: #aaa; }
+        .panel h1 { font-size: 32px; margin-bottom: 15px; color: #00f2fe; text-shadow: 0 0 10px rgba(0,242,254,0.5); }
+        .input-group { margin-bottom: 12px; text-align: left; }
+        .input-group label { display: block; font-size: 12px; margin-bottom: 4px; color: #aaa; }
         .input-group input, .input-group select {
             width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #333;
-            background: #161b2e; color: #fff; font-size: 16px; outline: none;
+            background: #161b2e; color: #fff; font-size: 16px; outline: none; -webkit-appearance: none;
         }
         .btn-play {
-            width: 100%; padding: 14px; border: none; border-radius: 8px;
+            width: 100%; padding: 12px; border: none; border-radius: 8px;
             background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-            color: white; font-weight: bold; font-size: 18px; cursor: pointer; margin-top: 10px;
+            color: white; font-weight: bold; font-size: 18px; cursor: pointer; margin-top: 5px;
         }
 
-        /* 實時排行榜 (Top 5 Leaderboard) */
+        /* Top 5 排行榜 */
         #leaderboard {
-            position: absolute; top: 15px; right: 15px; z-index: 5;
-            background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 12px 18px; border-radius: 10px; color: white; min-width: 180px;
+            position: absolute; top: 12px; right: 12px; z-index: 5;
+            background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 10px 14px; border-radius: 10px; color: white; width: 150px;
             backdrop-filter: blur(4px); pointer-events: none;
         }
-        #leaderboard h3 { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #00f2fe; margin-bottom: 8px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px; }
+        #leaderboard h3 { font-size: 12px; letter-spacing: 1px; color: #00f2fe; margin-bottom: 6px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 3px; }
         #leaderboard ol { list-style: none; padding: 0; margin: 0; }
-        #leaderboard li { font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; margin-bottom: 4px; color: #ddd; }
+        #leaderboard li { font-size: 12px; font-weight: 600; display: flex; justify-content: space-between; margin-bottom: 3px; color: #ddd; }
         #leaderboard li.me { color: #ffeb3b; }
 
-        /* 手機控制介面 */
-        #joystick-zone { position: absolute; bottom: 30px; left: 30px; width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); touch-action: none; z-index: 5; display: none; }
-        #joystick-knob { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,0.4); pointer-events: none; }
+        /* 手機專用虛擬控制器 */
+        #joystick-zone { position: absolute; bottom: 25px; left: 25px; width: 110px; height: 110px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); touch-action: none; z-index: 5; }
+        #joystick-knob { position: absolute; top: 32.5px; left: 32.5px; width: 45px; height: 45px; border-radius: 50%; background: rgba(255,255,255,0.4); pointer-events: none; }
+        #mobile-controls { position: absolute; bottom: 25px; right: 25px; display: flex; gap: 12px; z-index: 5; }
+        .act-btn { width: 58px; height: 58px; border-radius: 50%; background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.4); color: white; font-weight: bold; font-size: 14px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .act-btn:active { background: rgba(255,255,255,0.4); }
     </style>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
 <body>
 
-    <!-- 主大廳 UI -->
     <div id="lobby">
         <div class="panel">
             <h1>FR.io</h1>
@@ -64,45 +66,43 @@
             <div class="input-group">
                 <label>選擇伺服器</label>
                 <select id="server-select">
-                    <option value="frio_srv_asia_1">第一伺服器 (Asia 1)</option>
-                    <option value="frio_srv_asia_2">第二伺服器 (Asia 2)</option>
+                    <option value="frio_asia_server_1">第一伺服器 (Asia 1)</option>
+                    <option value="frio_asia_server_2">第二伺服器 (Asia 2)</option>
                 </select>
             </div>
             <button class="btn-play" onclick="startGame()">進入遊戲</button>
         </div>
     </div>
 
-    <!-- 排行榜面板 -->
     <div id="leaderboard">
         <h3>排行榜</h3>
         <ol id="rank-list"></ol>
     </div>
 
     <canvas id="gameCanvas"></canvas>
+
+    <!-- 行動端操作 -->
     <div id="joystick-zone"><div id="joystick-knob"></div></div>
+    <div id="mobile-controls">
+        <div class="act-btn" id="btn-w">W</div>
+        <div class="act-btn" id="btn-space">分</div>
+    </div>
 
 <script>
-// --- [1. 程式碼安全保護] ---
-(function() {
-    document.addEventListener('contextmenu', e => e.preventDefault());
-    setInterval(() => {
-        const start = performance.now();
-        debugger;
-        if (performance.now() - start > 100) window.location.reload();
-    }, 2000);
-})();
+// --- [1. 防手勢縮放與捲動] ---
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
 
 const GAME_SIG = "FR_IO_SECURE_AUTH_2026";
 const WORLD_SIZE = 4000;
 
-// --- [2. Canvas 高清適應 & 格子背景紋理繪製] ---
+// --- [2. 高清 Canvas 與棋盤格紋理] ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 let dpr = window.devicePixelRatio || 1;
 let gridPattern = null;
 
 function initGridPattern() {
-    // 預先繪製棋盤格紋理以極大化渲染效能
     const pCanvas = document.createElement('canvas');
     const gridSize = 60;
     pCanvas.width = gridSize;
@@ -127,29 +127,23 @@ function resizeCanvas() {
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
-// --- [3. 即時 P2P 網路 (低延遲連線)] ---
+// --- [3. 遊戲狀態與 P2P] ---
 let peer, conn, isHost = false;
 let myName = "無名玩家";
-let myId = Math.random().toString(36).substring(7);
+let myId = 'peer_' + Math.random().toString(36).substring(2, 9);
 
 let gameState = { players: {}, foods: [] };
-let localInput = { angle: 0, speed: 0 };
+let localInput = { angle: 0, speed: 0, split: false, eject: false };
 
 function startGame() {
     myName = document.getElementById('nickname').value.trim() || "無名玩家";
     const serverId = document.getElementById('server-select').value;
     document.getElementById('lobby').style.display = 'none';
 
-    // 啟動 Peer (採用可靠度調整)
-    peer = new Peer(myId + '_' + Math.floor(Math.random()*1000));
+    peer = new Peer(myId);
 
     peer.on('open', () => {
-        // 設定 P2P DataChannel 連線參數：使用 unreliable 模式降低排隊延遲 (接近 UDP)
-        conn = peer.connect(serverId, { 
-            metadata: { signature: GAME_SIG },
-            reliable: false 
-        });
-
+        conn = peer.connect(serverId, { metadata: { signature: GAME_SIG }, reliable: false });
         conn.on('open', () => setupClientConn(conn));
         conn.on('error', () => becomeHost(serverId));
 
@@ -163,8 +157,7 @@ function becomeHost(roomId) {
     isHost = true;
     peer = new Peer(roomId);
 
-    // 初始世界食物
-    for (let i = 0; i < 400; i++) gameState.foods.push(createFood());
+    for (let i = 0; i < 350; i++) gameState.foods.push(createFood());
     gameState.players[myId] = createPlayer(myId, myName);
 
     peer.on('connection', (c) => {
@@ -176,10 +169,10 @@ function becomeHost(roomId) {
                 gameState.players[c.peer].input = data.input;
             }
         });
+        c.on('close', () => { delete gameState.players[c.peer]; });
     });
 
-    // 60 FPS 物理運算，高頻廣播 State 確保順暢
-    setInterval(updateHostLogic, 1000 / 40);
+    setInterval(updateHostLogic, 1000 / 30);
 }
 
 function setupClientConn(c) {
@@ -192,8 +185,9 @@ function setupClientConn(c) {
 function createPlayer(id, name) {
     return {
         id, name,
-        x: Math.random() * WORLD_SIZE, y: Math.random() * WORLD_SIZE,
-        mass: 20, color: `hsl(${Math.random() * 360}, 75%, 55%)`,
+        x: Math.random() * (WORLD_SIZE - 200) + 100,
+        y: Math.random() * (WORLD_SIZE - 200) + 100,
+        mass: 20, color: `hsl(${Math.random() * 360}, 80%, 55%)`,
         input: { angle: 0, speed: 0 }
     };
 }
@@ -208,7 +202,7 @@ function updateHostLogic() {
         let input = (id === myId) ? localInput : p.input;
 
         let radius = Math.sqrt(p.mass) * 8;
-        let speed = Math.max(2, 7.5 - (radius * 0.04)) * (input.speed || 0);
+        let speed = Math.max(1.8, 7.5 - (radius * 0.035)) * (input.speed || 0);
 
         p.x += Math.cos(input.angle) * speed;
         p.y += Math.sin(input.angle) * speed;
@@ -225,7 +219,6 @@ function updateHostLogic() {
         }
     });
 
-    // 廣播最新全域狀態
     if (peer && peer.connections) {
         Object.keys(peer.connections).forEach(pId => {
             if (peer.connections[pId][0] && peer.connections[pId][0].open) {
@@ -235,22 +228,16 @@ function updateHostLogic() {
     }
 }
 
-// --- [4. 即時繪製與 Top 5 排行榜更新] ---
+// --- [4. 渲染與優化版排行榜] ---
 function updateLeaderboard() {
     const listEl = document.getElementById('rank-list');
-    
-    // 按質量排序玩家
-    const sorted = Object.values(gameState.players)
-        .sort((a, b) => b.mass - a.mass)
-        .slice(0, 5); // 僅選取前 5 名
+    const sorted = Object.values(gameState.players).sort((a, b) => b.mass - a.mass).slice(0, 5);
 
-    listEl.innerHTML = '';
-    sorted.forEach((p, index) => {
-        const li = document.createElement('li');
-        if (p.id === myId) li.className = 'me';
-        li.innerHTML = `<span>${index + 1}. ${p.name}</span><span>${Math.floor(p.mass)}</span>`;
-        listEl.appendChild(li);
+    let html = '';
+    sorted.forEach((p, i) => {
+        html += `<li class="${p.id === myId ? 'me' : ''}"><span>${i + 1}. ${p.name}</span><span>${Math.floor(p.mass)}</span></li>`;
     });
+    listEl.innerHTML = html;
 }
 
 function render() {
@@ -262,41 +249,31 @@ function render() {
         ctx.scale(dpr, dpr);
         ctx.translate(window.innerWidth / 2 - me.x, window.innerHeight / 2 - me.y);
 
-        // 1. 繪製棋盤格背景 (無限擴展 Pattern)
         ctx.fillStyle = gridPattern;
         ctx.fillRect(-WORLD_SIZE, -WORLD_SIZE, WORLD_SIZE * 3, WORLD_SIZE * 3);
 
-        // 地圖邊界線
         ctx.strokeStyle = '#ff0055'; ctx.lineWidth = 8;
         ctx.strokeRect(0, 0, WORLD_SIZE, WORLD_SIZE);
 
-        // 2. 食物繪製
         gameState.foods.forEach(f => {
             ctx.fillStyle = f.color;
-            ctx.beginPath();
-            ctx.arc(f.x, f.y, 4, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.beginPath(); ctx.arc(f.x, f.y, 4, 0, Math.PI * 2); ctx.fill();
         });
 
-        // 3. 玩家球體繪製 (正圓 + 名稱)
         Object.values(gameState.players).forEach(p => {
             let r = Math.sqrt(p.mass) * 8;
 
             ctx.fillStyle = p.color;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
             ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.stroke();
 
             ctx.fillStyle = '#ffffff';
             ctx.font = `bold ${Math.max(12, r * 0.35)}px sans-serif`;
             ctx.textAlign = 'center';
-            ctx.fillText(p.name, p.x, p.y + (r * 0.1));
+            ctx.fillText(p.name, p.x, p.y + (r * 0.12));
         });
 
         ctx.restore();
-
-        // 刷新排行榜
         updateLeaderboard();
     }
 
@@ -304,7 +281,7 @@ function render() {
 }
 requestAnimationFrame(render);
 
-// --- [5. 操作控制] ---
+// --- [5. 鍵盤 + 手機觸控輸入綁定] ---
 window.addEventListener('mousemove', (e) => {
     let centerX = window.innerWidth / 2;
     let centerY = window.innerHeight / 2;
@@ -312,6 +289,34 @@ window.addEventListener('mousemove', (e) => {
     localInput.speed = 1;
     sendInput();
 });
+
+const joyZone = document.getElementById('joystick-zone');
+const joyKnob = document.getElementById('joystick-knob');
+
+joyZone.addEventListener('touchmove', (e) => {
+    let rect = joyZone.getBoundingClientRect();
+    let touch = e.touches[0];
+    let dx = touch.clientX - (rect.left + rect.width / 2);
+    let dy = touch.clientY - (rect.top + rect.height / 2);
+    let dist = Math.hypot(dx, dy);
+    let maxDist = rect.width / 2;
+    let angle = Math.atan2(dy, dx);
+    let limitDist = Math.min(dist, maxDist);
+
+    joyKnob.style.transform = `translate(${Math.cos(angle)*limitDist}px, ${Math.sin(angle)*limitDist}px)`;
+    localInput.angle = angle;
+    localInput.speed = limitDist / maxDist;
+    sendInput();
+});
+
+joyZone.addEventListener('touchend', () => {
+    joyKnob.style.transform = `translate(0px, 0px)`;
+    localInput.speed = 0;
+    sendInput();
+});
+
+document.getElementById('btn-w').addEventListener('touchstart', (e) => { e.preventDefault(); localInput.eject = true; sendInput(); });
+document.getElementById('btn-space').addEventListener('touchstart', (e) => { e.preventDefault(); localInput.split = true; sendInput(); });
 
 function sendInput() {
     if (!isHost && conn && conn.open) conn.send({ type: 'INPUT', input: localInput });
