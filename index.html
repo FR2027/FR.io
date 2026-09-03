@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>FR.io - TC Edition</title>
+    <title>FR.io - Ultimate Edition</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; touch-action: none; }
         body, html { width: 100%; height: 100%; overflow: hidden; background: #0c0f1d; font-family: 'Segoe UI', Arial, sans-serif; position: fixed; }
         canvas { display: block; width: 100vw; height: 100vh; position: absolute; top:0; left:0; z-index: 1; }
 
-        #lobby {
+        /* 大廳與彈窗 UI */
+        .overlay-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(12, 15, 29, 0.92); backdrop-filter: blur(10px);
             display: flex; justify-content: center; align-items: center; z-index: 10; color: white;
@@ -26,12 +27,14 @@
             width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #333;
             background: #161b2e; color: #fff; font-size: 16px; outline: none; -webkit-appearance: none;
         }
-        .btn-play {
+        .btn {
             width: 100%; padding: 12px; border: none; border-radius: 8px;
             background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-            color: white; font-weight: bold; font-size: 18px; cursor: pointer; margin-top: 5px;
+            color: white; font-weight: bold; font-size: 16px; cursor: pointer; margin-top: 8px;
         }
+        .btn-sec { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); }
 
+        /* Top 5 排行榜 */
         #leaderboard {
             position: absolute; top: 12px; right: 12px; z-index: 5;
             background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.1);
@@ -43,6 +46,7 @@
         #leaderboard li { font-size: 12px; font-weight: 600; display: flex; justify-content: space-between; margin-bottom: 3px; color: #ddd; }
         #leaderboard li.me { color: #ffeb3b; }
 
+        /* 手機控制器 */
         #joystick-zone { position: absolute; bottom: 25px; left: 25px; width: 110px; height: 110px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); touch-action: none; z-index: 5; }
         #joystick-knob { position: absolute; top: 32.5px; left: 32.5px; width: 45px; height: 45px; border-radius: 50%; background: rgba(255,255,255,0.4); pointer-events: none; }
         #mobile-controls { position: absolute; bottom: 25px; right: 25px; display: flex; gap: 12px; z-index: 5; }
@@ -53,7 +57,8 @@
 </head>
 <body>
 
-    <div id="lobby">
+    <!-- 主大廳 -->
+    <div id="lobby" class="overlay-screen">
         <div class="panel">
             <h1>FR.io</h1>
             <div class="input-group">
@@ -67,7 +72,17 @@
                     <option value="frio_asia_server_2">第二伺服器 (Asia 2)</option>
                 </select>
             </div>
-            <button class="btn-play" onclick="startGame()">進入遊戲</button>
+            <button class="btn" onclick="startGame()">進入遊戲</button>
+        </div>
+    </div>
+
+    <!-- 死亡結算視窗 -->
+    <div id="gameover" class="overlay-screen" style="display: none;">
+        <div class="panel">
+            <h1 style="color: #ff0055;">你被吞噬了！</h1>
+            <p style="margin-bottom: 15px; color: #ccc;">最終分數: <span id="final-score" style="color: #ffeb3b; font-weight: bold;">0</span></p>
+            <button class="btn" onclick="respawn()">重新遊玩</button>
+            <button class="btn btn-sec" onclick="returnToLobby()">返回大廳</button>
         </div>
     </div>
 
@@ -98,11 +113,10 @@ let gridPattern = null;
 
 function initGridPattern() {
     const pCanvas = document.createElement('canvas');
-    const gridSize = 60;
-    pCanvas.width = gridSize; pCanvas.height = gridSize;
+    pCanvas.width = 60; pCanvas.height = 60;
     const pCtx = pCanvas.getContext('2d');
-    pCtx.fillStyle = '#0c0f1d'; pCtx.fillRect(0, 0, gridSize, gridSize);
-    pCtx.strokeStyle = '#181d36'; pCtx.lineWidth = 2; pCtx.strokeRect(0, 0, gridSize, gridSize);
+    pCtx.fillStyle = '#0c0f1d'; pCtx.fillRect(0, 0, 60, 60);
+    pCtx.strokeStyle = '#181d36'; pCtx.lineWidth = 2; pCtx.strokeRect(0, 0, 60, 60);
     gridPattern = ctx.createPattern(pCanvas, 'repeat');
 }
 
@@ -139,11 +153,26 @@ function startGame() {
     });
 }
 
+function respawn() {
+    document.getElementById('gameover').style.display = 'none';
+    if (isHost) {
+        gameState.players[myId] = createPlayer(myId, myName);
+    } else if (conn && conn.open) {
+        conn.send({ type: 'RESPAWN', name: myName });
+    }
+}
+
+function returnToLobby() {
+    document.getElementById('gameover').style.display = 'none';
+    document.getElementById('lobby').style.display = 'flex';
+    if (peer) peer.destroy();
+}
+
 function becomeHost(roomId) {
     isHost = true;
     peer = new Peer(roomId);
 
-    for (let i = 0; i < 350; i++) gameState.foods.push(createFood());
+    for (let i = 0; i < 400; i++) gameState.foods.push(createFood());
     for (let i = 0; i < 15; i++) gameState.viruses.push(createVirus());
     gameState.players[myId] = createPlayer(myId, myName);
 
@@ -152,7 +181,9 @@ function becomeHost(roomId) {
 
         c.on('data', (data) => {
             if (gameState.players[c.peer]) gameState.players[c.peer].lastSeen = Date.now();
-            if (data.type === 'JOIN') gameState.players[c.peer] = createPlayer(c.peer, data.name);
+            if (data.type === 'JOIN' || data.type === 'RESPAWN') {
+                gameState.players[c.peer] = createPlayer(c.peer, data.name);
+            }
             if (data.type === 'INPUT' && gameState.players[c.peer]) {
                 gameState.players[c.peer].input = data.input;
             }
@@ -173,9 +204,13 @@ function setupClientConn(c) {
 function createPlayer(id, name) {
     return {
         id, name,
-        x: Math.random() * (WORLD_SIZE - 200) + 100,
-        y: Math.random() * (WORLD_SIZE - 200) + 100,
-        mass: 20, color: `hsl(${Math.random() * 360}, 80%, 55%)`,
+        color: `hsl(${Math.random() * 360}, 80%, 55%)`,
+        cells: [{
+            x: Math.random() * (WORLD_SIZE - 400) + 200,
+            y: Math.random() * (WORLD_SIZE - 400) + 200,
+            mass: 20, vx: 0, vy: 0,
+            splitTime: 0
+        }],
         input: { angle: 0, speed: 0, split: false, eject: false },
         lastSeen: Date.now()
     };
@@ -186,65 +221,127 @@ function createFood() {
 }
 
 function createVirus() {
-    return { x: Math.random() * (WORLD_SIZE - 300) + 150, y: Math.random() * (WORLD_SIZE - 300) + 150, radius: 42, mass: 100 };
+    return { x: Math.random() * (WORLD_SIZE - 400) + 200, y: Math.random() * (WORLD_SIZE - 400) + 200, radius: 45, mass: 100 };
 }
 
 function updateHostLogic() {
     const now = Date.now();
-    let playerList = Object.values(gameState.players);
 
-    // 清除超過 3 秒離線的幽靈玩家
+    // 幽靈清理
     Object.keys(gameState.players).forEach(pId => {
-        if (pId !== myId && now - gameState.players[pId].lastSeen > 3000) {
-            delete gameState.players[pId];
-        }
+        if (pId !== myId && now - gameState.players[pId].lastSeen > 3000) delete gameState.players[pId];
     });
 
-    playerList.forEach(p => {
+    // 玩家邏輯
+    Object.values(gameState.players).forEach(p => {
         let input = (p.id === myId) ? localInput : p.input;
 
-        // W 吐質機制
-        if (input.eject && p.mass >= 35) {
-            p.mass -= 13;
-            let r = Math.sqrt(p.mass) * 8;
-            gameState.ejected.push({
-                x: p.x + Math.cos(input.angle) * (r + 15),
-                y: p.y + Math.sin(input.angle) * (r + 15),
-                angle: input.angle,
-                speed: 12,
-                mass: 10,
-                color: p.color
+        // --- 1. W 吐質機制 ---
+        if (input.eject) {
+            p.cells.forEach(cell => {
+                if (cell.mass >= 35) {
+                    cell.mass -= 13;
+                    let r = Math.sqrt(cell.mass) * 8;
+                    gameState.ejected.push({
+                        x: cell.x + Math.cos(input.angle) * (r + 10),
+                        y: cell.y + Math.sin(input.angle) * (r + 10),
+                        angle: input.angle, speed: 14, mass: 10, color: p.color
+                    });
+                }
             });
             input.eject = false;
         }
 
-        let radius = Math.sqrt(p.mass) * 8;
-        let speed = Math.max(1.8, 7.5 - (radius * 0.035)) * (input.speed || 0);
-
-        p.x += Math.cos(input.angle) * speed;
-        p.y += Math.sin(input.angle) * speed;
-
-        p.x = Math.max(radius, Math.min(WORLD_SIZE - radius, p.x));
-        p.y = Math.max(radius, Math.min(WORLD_SIZE - radius, p.y));
-
-        // 吞噬食物與噴出質量塊
-        for (let i = gameState.foods.length - 1; i >= 0; i--) {
-            let f = gameState.foods[i];
-            if (Math.hypot(p.x - f.x, p.y - f.y) < radius) {
-                p.mass += 1;
-                gameState.foods[i] = createFood();
-            }
+        // --- 2. 分裂機制（Space）---
+        if (input.split) {
+            let newCells = [];
+            p.cells.forEach(cell => {
+                if (cell.mass >= 36 && p.cells.length + newCells.length < 16) {
+                    cell.mass /= 2;
+                    newCells.push({
+                        x: cell.x, y: cell.y, mass: cell.mass,
+                        vx: Math.cos(input.angle) * 22, vy: Math.sin(input.angle) * 22,
+                        splitTime: now
+                    });
+                    cell.splitTime = now;
+                }
+            });
+            p.cells.push(...newCells);
+            input.split = false;
         }
-        for (let i = gameState.ejected.length - 1; i >= 0; i--) {
-            let e = gameState.ejected[i];
-            if (Math.hypot(p.x - e.x, p.y - e.y) < radius) {
-                p.mass += e.mass;
-                gameState.ejected.splice(i, 1);
+
+        // --- 3. 物理移動與碰撞 ---
+        p.cells.forEach((cell, idx) => {
+            let radius = Math.sqrt(cell.mass) * 8;
+            let speed = Math.max(1.8, 7.5 - (radius * 0.035)) * (input.speed || 0);
+
+            cell.x += Math.cos(input.angle) * speed + (cell.vx || 0);
+            cell.y += Math.sin(input.angle) * speed + (cell.vy || 0);
+
+            // 衝力衰減
+            if (cell.vx) cell.vx *= 0.88;
+            if (cell.vy) cell.vy *= 0.88;
+
+            cell.x = Math.max(radius, Math.min(WORLD_SIZE - radius, cell.x));
+            cell.y = Math.max(radius, Math.min(WORLD_SIZE - radius, cell.y));
+
+            // 吃食物
+            for (let i = gameState.foods.length - 1; i >= 0; i--) {
+                let f = gameState.foods[i];
+                if (Math.hypot(cell.x - f.x, cell.y - f.y) < radius) {
+                    cell.mass += 1;
+                    gameState.foods[i] = createFood();
+                }
+            }
+
+            // 吃吐質球
+            for (let i = gameState.ejected.length - 1; i >= 0; i--) {
+                let e = gameState.ejected[i];
+                if (Math.hypot(cell.x - e.x, cell.y - e.y) < radius) {
+                    cell.mass += e.mass;
+                    gameState.ejected.splice(i, 1);
+                }
+            }
+
+            // --- 4. 撞擊綠色刺球爆破 ---
+            for (let i = 0; i < gameState.viruses.length; i++) {
+                let v = gameState.viruses[i];
+                if (cell.mass > v.radius && Math.hypot(cell.x - v.x, cell.y - v.y) < radius) {
+                    // 強制拆分為多個小球
+                    let pieces = Math.min(8, Math.floor(cell.mass / 20));
+                    if (pieces > 1) {
+                        cell.mass /= pieces;
+                        for (let k = 1; k < pieces; k++) {
+                            let a = (Math.PI * 2 / pieces) * k;
+                            p.cells.push({
+                                x: cell.x, y: cell.y, mass: cell.mass,
+                                vx: Math.cos(a) * 16, vy: Math.sin(a) * 16,
+                                splitTime: now
+                            });
+                        }
+                    }
+                    gameState.viruses[i] = createVirus(); // 刷新刺球
+                    break;
+                }
+            }
+        });
+
+        // 內部自動融合 (30 秒冷卻)
+        for (let i = 0; i < p.cells.length; i++) {
+            for (let j = i + 1; j < p.cells.length; j++) {
+                let c1 = p.cells[i], c2 = p.cells[j];
+                if (now - c1.splitTime > 30000 && now - c2.splitTime > 30000) {
+                    if (Math.hypot(c1.x - c2.x, c1.y - c2.y) < Math.sqrt(c1.mass)*8) {
+                        c1.mass += c2.mass;
+                        p.cells.splice(j, 1);
+                        j--;
+                    }
+                }
             }
         }
     });
 
-    // 動態更新吐質小球飛行狀態
+    // 吐質飛行物理
     gameState.ejected.forEach(e => {
         if (e.speed > 0) {
             e.x += Math.cos(e.angle) * e.speed;
@@ -253,26 +350,35 @@ function updateHostLogic() {
         }
     });
 
-    // 玩家互吃判定 (大於對方 20 點質量)
-    for (let i = 0; i < playerList.length; i++) {
-        for (let j = 0; j < playerList.length; j++) {
+    // --- 5. 玩家與玩家吞噬邏輯 ---
+    let allPlayers = Object.values(gameState.players);
+    for (let i = 0; i < allPlayers.length; i++) {
+        for (let j = 0; j < allPlayers.length; j++) {
             if (i === j) continue;
-            let p1 = playerList[i];
-            let p2 = playerList[j];
+            let p1 = allPlayers[i], p2 = allPlayers[j];
 
-            if (p1.mass >= p2.mass + 20) {
-                let r1 = Math.sqrt(p1.mass) * 8;
-                if (Math.hypot(p1.x - p2.x, p1.y - p2.y) < r1 - 8) {
-                    p1.mass += p2.mass;
-                    p2.mass = 20;
-                    p2.x = Math.random() * (WORLD_SIZE - 200) + 100;
-                    p2.y = Math.random() * (WORLD_SIZE - 200) + 100;
+            p1.cells.forEach(c1 => {
+                for (let k = p2.cells.length - 1; k >= 0; k--) {
+                    let c2 = p2.cells[k];
+                    if (c1.mass >= c2.mass + 20) {
+                        let r1 = Math.sqrt(c1.mass) * 8;
+                        if (Math.hypot(c1.x - c2.x, c1.y - c2.y) < r1 - 5) {
+                            c1.mass += c2.mass;
+                            p2.cells.splice(k, 1);
+                        }
+                    }
                 }
+            });
+
+            // 判定玩家死亡 (所有 Cells 歸零)
+            if (p2.cells.length === 0) {
+                if (p2.id === myId) triggerGameOver();
+                delete gameState.players[p2.id];
             }
         }
     }
 
-    // 廣播最新世界狀態
+    // 廣播最新遊戲狀態
     if (peer && peer.connections) {
         Object.keys(peer.connections).forEach(pId => {
             if (peer.connections[pId][0] && peer.connections[pId][0].open) {
@@ -282,13 +388,22 @@ function updateHostLogic() {
     }
 }
 
+function triggerGameOver() {
+    let finalScore = 0;
+    document.getElementById('final-score').innerText = finalScore;
+    document.getElementById('gameover').style.display = 'flex';
+}
+
 function updateLeaderboard() {
     const listEl = document.getElementById('rank-list');
-    const sorted = Object.values(gameState.players).sort((a, b) => b.mass - a.mass).slice(0, 5);
+    const sorted = Object.values(gameState.players).map(p => ({
+        id: p.id, name: p.name,
+        totalMass: p.cells.reduce((sum, c) => sum + c.mass, 0)
+    })).sort((a, b) => b.totalMass - a.totalMass).slice(0, 5);
 
     let html = '';
     sorted.forEach((p, i) => {
-        html += `<li class="${p.id === myId ? 'me' : ''}"><span>${i + 1}. ${p.name}</span><span>${Math.floor(p.mass)}</span></li>`;
+        html += `<li class="${p.id === myId ? 'me' : ''}"><span>${i + 1}. ${p.name}</span><span>${Math.floor(p.totalMass)}</span></li>`;
     });
     listEl.innerHTML = html;
 }
@@ -297,10 +412,14 @@ function render() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     let me = gameState.players[myId];
-    if (me) {
+    if (me && me.cells.length > 0) {
+        // 計算攝影機中心點 (所有 Cells 算術平均)
+        let avgX = me.cells.reduce((sum, c) => sum + c.x, 0) / me.cells.length;
+        let avgY = me.cells.reduce((sum, c) => sum + c.y, 0) / me.cells.length;
+
         ctx.save();
         ctx.scale(dpr, dpr);
-        ctx.translate(window.innerWidth / 2 - me.x, window.innerHeight / 2 - me.y);
+        ctx.translate(window.innerWidth / 2 - avgX, window.innerHeight / 2 - avgY);
 
         ctx.fillStyle = gridPattern;
         ctx.fillRect(-WORLD_SIZE, -WORLD_SIZE, WORLD_SIZE * 3, WORLD_SIZE * 3);
@@ -308,7 +427,7 @@ function render() {
         ctx.strokeStyle = '#ff0055'; ctx.lineWidth = 8;
         ctx.strokeRect(0, 0, WORLD_SIZE, WORLD_SIZE);
 
-        // 食物與吐質小球 (底層)
+        // 食物與吐質
         gameState.foods.forEach(f => {
             ctx.fillStyle = f.color;
             ctx.beginPath(); ctx.arc(f.x, f.y, 4, 0, Math.PI * 2); ctx.fill();
@@ -319,26 +438,30 @@ function render() {
             ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
         });
 
-        // 刺球 (中層)
+        // 刺球
         gameState.viruses.forEach(v => {
             ctx.fillStyle = '#33ff33';
             ctx.beginPath(); ctx.arc(v.x, v.y, v.radius, 0, Math.PI * 2); ctx.fill();
             ctx.strokeStyle = '#22cc22'; ctx.lineWidth = 4; ctx.stroke();
         });
 
-        // 玩家排序（質量小先畫，大球壓在上層）
-        const sortedPlayers = Object.values(gameState.players).sort((a, b) => a.mass - b.mass);
-        sortedPlayers.forEach(p => {
-            let r = Math.sqrt(p.mass) * 8;
+        // 玩家繪製 (攤平所有球體並按質量排序繪製)
+        let renderCells = [];
+        Object.values(gameState.players).forEach(p => {
+            p.cells.forEach(c => renderCells.push({ ...c, color: p.color, name: p.name }));
+        });
+        renderCells.sort((a, b) => a.mass - b.mass);
 
-            ctx.fillStyle = p.color;
-            ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+        renderCells.forEach(c => {
+            let r = Math.sqrt(c.mass) * 8;
+            ctx.fillStyle = c.color;
+            ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, Math.PI * 2); ctx.fill();
             ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.stroke();
 
             ctx.fillStyle = '#ffffff';
             ctx.font = `bold ${Math.max(12, r * 0.35)}px sans-serif`;
             ctx.textAlign = 'center';
-            ctx.fillText(p.name, p.x, p.y + (r * 0.12));
+            ctx.fillText(c.name, c.x, c.y + (r * 0.12));
         });
 
         ctx.restore();
@@ -349,7 +472,7 @@ function render() {
 }
 requestAnimationFrame(render);
 
-// 輸入操控綁定
+// 控制綁定
 window.addEventListener('mousemove', (e) => {
     let centerX = window.innerWidth / 2;
     let centerY = window.innerHeight / 2;
