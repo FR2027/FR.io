@@ -2,278 +2,302 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>FR.io - 棉被家族</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FR.io - Ultima Edition</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background: #111; font-family: sans-serif; }
-        canvas { display: block; width: 100vw; height: 100vh; }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #0b0e14; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         
-        /* 介面 UI */
-        #hud { position: absolute; top: 10px; left: 10px; color: #fff; text-shadow: 1px 1px 2px #000; pointer-events: none; }
-        #controls { position: absolute; bottom: 20px; right: 20px; display: flex; gap: 15px; }
-        .btn { width: 65px; height: 65px; border-radius: 50%; background: rgba(255,255,255,0.3); border: 2px solid #fff; color: white; font-weight: bold; font-size: 16px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); active { background: rgba(255,255,255,0.6); } }
-        
-        /* 虛擬搖桿區域 */
-        #joystick-zone { position: absolute; bottom: 20px; left: 20px; width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); touch-action: none; }
-        #joystick-knob { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,0.5); pointer-events: none; }
+        canvas { display: block; width: 100vw; height: 100vh; position: absolute; top:0; left:0; z-index: 1; }
+
+        /* 登入大廳 UI */
+        #lobby {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(11, 14, 20, 0.85); backdrop-filter: blur(8px);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 10; color: white;
+        }
+        .panel {
+            background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 30px; border-radius: 16px; width: 320px; text-align: center;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        .panel h1 { font-size: 32px; margin-bottom: 20px; letter-spacing: 2px; color: #4facfe; }
+        .input-group { margin-bottom: 15px; text-align: left; }
+        .input-group label { display: block; font-size: 12px; margin-bottom: 5px; color: #aaa; }
+        .input-group input, .input-group select {
+            width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #333;
+            background: #1a1f2c; color: #fff; font-size: 16px; outline: none;
+        }
+        .btn-play {
+            width: 100%; padding: 12px; border: none; border-radius: 8px;
+            background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+            color: white; font-weight: bold; font-size: 18px; cursor: pointer;
+            margin-top: 10px; transition: transform 0.1s;
+        }
+        .btn-play:active { transform: scale(0.98); }
+
+        /* 觸控控制（手機專用） */
+        #joystick-zone { position: absolute; bottom: 30px; left: 30px; width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); touch-action: none; z-index: 5; display: none; }
+        #joystick-knob { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,0.4); pointer-events: none; }
+        #mobile-btns { position: absolute; bottom: 30px; right: 30px; display: none; gap: 15px; z-index: 5; }
+        .act-btn { width: 65px; height: 65px; border-radius: 50%; background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.5); color: white; font-weight: bold; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
     </style>
-    <!-- PeerJS P2P 網路庫 -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
 <body>
 
-    <div id="hud">
-        <h2>FR.io 棉被家族</h2>
-        <p>質量: <span id="mass-val">10</span></p>
-        <p>房間 ID: <span id="room-id">建立中...</span></p>
+    <!-- 主大廳 -->
+    <div id="lobby">
+        <div class="panel">
+            <h1>FR.io</h1>
+            <div class="input-group">
+                <label>玩家名稱</label>
+                <input type="text" id="nickname" placeholder="請輸入暱稱..." maxlength="12" value="無名玩家">
+            </div>
+            <div class="input-group">
+                <label>選擇伺服器</label>
+                <select id="server-select">
+                    <option value="frio_server_01_asia">第一伺服器 (Asia 1)</option>
+                    <option value="frio_server_02_asia">第二伺服器 (Asia 2)</option>
+                </select>
+            </div>
+            <button class="btn-play" onclick="startGame()">進入遊戲</button>
+        </div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
 
     <!-- 行動端操作介面 -->
     <div id="joystick-zone"><div id="joystick-knob"></div></div>
-    <div id="controls">
-        <div class="btn" id="btn-eject">W</div>
-        <div class="btn" id="btn-split">Space</div>
+    <div id="mobile-btns">
+        <div class="act-btn" id="btn-w">W</div>
+        <div class="act-btn" id="btn-space">分</div>
     </div>
 
 <script>
-const WORLD_SIZE = 3000;
+// --- [1. 安全與防除錯機制 (Basic Security Setup)] ---
+(function protectCode() {
+    // 禁用右鍵選單
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    
+    // 簡化版的 DevTools 偵測防護
+    setInterval(() => {
+        const startTime = performance.now();
+        debugger; // 如果開啟 F12，此處會暫停，導致時間差巨大
+        if (performance.now() - startTime > 100) {
+            window.location.reload(); // 檢測到被除錯直接刷新
+        }
+    }, 2000);
+})();
+
+// 自訂防偽加密握手 Key
+const GAME_SIGNATURE = "FR_IO_SECURE_AUTH_KEY_2026";
+
+// --- [2. 視窗與 DPI 高清正圓適應] ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+let dpr = window.devicePixelRatio || 1;
 
-// 自動適應螢幕
-function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+function resizeCanvas() {
+    dpr = window.devicePixelRatio || 1;
+    // 解決手機非正圓：實際渲染 Canvas 放大，CSS 保持 100%
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
 }
-window.addEventListener('resize', resize);
-resize();
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
 
-// 玩家數據模型
+// 手機裝置檢測
+const isMobile = 'ontouchstart' in window;
+if (isMobile) {
+    document.getElementById('joystick-zone').style.display = 'block';
+    document.getElementById('mobile-btns').style.display = 'flex';
+}
+
+// --- [3. 遊戲邏輯與 P2P] ---
+const WORLD_SIZE = 4000;
+let peer, conn, isHost = false;
+let myPlayerName = "無名玩家";
 let myId = Math.random().toString(36).substring(7);
-let isHost = false;
-let peer, hostConn;
-let connections = {};
 
-let gameState = {
-    players: {},
-    foods: []
-};
+let gameState = { players: {}, foods: [], viruses: [] };
+let localInput = { angle: 0, speed: 0 };
 
-let localInput = { angle: 0, speed: 0, split: false, eject: false };
+function startGame() {
+    myPlayerName = document.getElementById('nickname').value.trim() || "無名玩家";
+    const serverRoomId = document.getElementById('server-select').value;
+    
+    document.getElementById('lobby').style.display = 'none';
 
-// 初始化 P2P
-function initP2P() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const joinId = urlParams.get('room');
+    // 初始化 PeerJS 並對應自訂通訊協定
+    peer = new Peer(myId + '_' + Math.floor(Math.random()*1000));
 
-    peer = new Peer();
+    peer.on('open', () => {
+        // 嘗試加入伺服器指定房號 (Host)
+        conn = peer.connect(serverRoomId, { metadata: { signature: GAME_SIGNATURE } });
 
-    peer.on('open', (id) => {
-        if (!joinId) {
-            // 房主 (Host)
-            isHost = true;
-            document.getElementById('room-id').innerText = id;
-            initHostGame();
-        } else {
-            // 客戶端 (Client)
-            document.getElementById('room-id').innerText = joinId + " (已加入)";
-            hostConn = peer.connect(joinId);
-            setupClientConn(hostConn);
-        }
-    });
-
-    peer.on('connection', (conn) => {
-        if (isHost) {
-            connections[conn.peer] = conn;
-            conn.on('data', (data) => {
-                if (data.type === 'INPUT') {
-                    if (gameState.players[conn.peer]) {
-                        gameState.players[conn.peer].input = data.input;
-                    }
-                }
-            });
-            conn.on('close', () => {
-                delete gameState.players[conn.peer];
-                delete connections[conn.peer];
-            });
-        }
-    });
-}
-
-// 房主邏輯（初始化世界與食物）
-function initHostGame() {
-    for (let i = 0; i < 300; i++) {
-        gameState.foods.push({
-            id: i,
-            x: Math.random() * WORLD_SIZE,
-            y: Math.random() * WORLD_SIZE,
-            color: `hsl(${Math.random() * 360}, 80%, 50%)`
+        conn.on('open', () => {
+            // 代表房號已有 Host，註冊為 Client
+            setupClientConn(conn);
         });
-    }
 
-    // 建立 Host 自己
-    spawnPlayer(myId, "棉被王");
+        conn.on('error', () => {
+            // 若該房號無人建立，自己接管成為 Host
+            becomeHost(serverRoomId);
+        });
 
-    // 主循環 (Host Logic Loop 30 FPS)
-    setInterval(updateHost, 1000 / 30);
+        // Timeout 沒回應也自動接管房主
+        setTimeout(() => {
+            if (!conn || !conn.open) becomeHost(serverRoomId);
+        }, 1500);
+    });
 }
 
-function spawnPlayer(id, name) {
-    gameState.players[id] = {
-        id: id,
-        name: name,
+function becomeHost(roomId) {
+    isHost = true;
+    peer = new Peer(roomId); // 強行綁定伺服器房間識別碼
+    
+    // 生成刺球與食物
+    for (let i = 0; i < 400; i++) gameState.foods.push(createFood());
+    for (let i = 0; i < 15; i++) gameState.viruses.push(createVirus());
+
+    gameState.players[myId] = createPlayer(myId, myPlayerName);
+
+    peer.on('connection', (c) => {
+        // 加密驗證握手：檢查簽名
+        if (!c.metadata || c.metadata.signature !== GAME_SIGNATURE) {
+            c.close(); // 非法修改客戶端，拒絕連線
+            return;
+        }
+
+        c.on('data', (data) => {
+            if (data.type === 'JOIN') {
+                gameState.players[c.peer] = createPlayer(c.peer, data.name);
+            }
+            if (data.type === 'INPUT' && gameState.players[c.peer]) {
+                gameState.players[c.peer].input = data.input;
+            }
+        });
+    });
+
+    setInterval(updateHostLogic, 1000 / 30); // 30 FPS 物理邏輯
+}
+
+function setupClientConn(c) {
+    c.send({ type: 'JOIN', name: myPlayerName });
+    c.on('data', (data) => {
+        if (data.type === 'STATE') gameState = data.state;
+    });
+}
+
+function createPlayer(id, name) {
+    return {
+        id, name,
         x: Math.random() * WORLD_SIZE,
         y: Math.random() * WORLD_SIZE,
         mass: 20,
-        color: '#3498db',
+        color: `hsl(${Math.random() * 360}, 70%, 50%)`,
         input: { angle: 0, speed: 0 }
     };
 }
 
-function setupClientConn(conn) {
-    conn.on('open', () => {
-        conn.send({ type: 'JOIN', name: '棉被分身_' + myId.slice(0, 3) });
-    });
-    conn.on('data', (data) => {
-        if (data.type === 'STATE') {
-            gameState = data.state;
-        }
-    });
+function createFood() {
+    return { x: Math.random() * WORLD_SIZE, y: Math.random() * WORLD_SIZE, color: `hsl(${Math.random() * 360}, 80%, 60%)` };
 }
 
-// Host 物理計算與碰撞
-function updateHost() {
-    // 處理玩家移動
+function createVirus() {
+    return { x: Math.random() * WORLD_SIZE, y: Math.random() * WORLD_SIZE, radius: 45 };
+}
+
+// 主機端物理與遊戲運算
+function updateHostLogic() {
     Object.keys(gameState.players).forEach(id => {
         let p = gameState.players[id];
         let input = (id === myId) ? localInput : p.input;
-        
+
         let radius = Math.sqrt(p.mass) * 8;
-        let speed = Math.max(1.5, 8 - (radius * 0.05)) * (input.speed || 1);
+        let speed = Math.max(1.8, 7 - (radius * 0.04)) * (input.speed || 0);
 
-        if (input.speed > 0) {
-            p.x += Math.cos(input.angle) * speed;
-            p.y += Math.sin(input.angle) * speed;
-        }
+        p.x += Math.cos(input.angle) * speed;
+        p.y += Math.sin(input.angle) * speed;
 
-        // 邊界限制
+        // 正確邊界邊界校正
         p.x = Math.max(radius, Math.min(WORLD_SIZE - radius, p.x));
         p.y = Math.max(radius, Math.min(WORLD_SIZE - radius, p.y));
 
-        // 吃食物判定
+        // 吞噬食物
         for (let i = gameState.foods.length - 1; i >= 0; i--) {
             let f = gameState.foods[i];
-            let dist = Math.hypot(p.x - f.x, p.y - f.y);
-            if (dist < radius) {
+            if (Math.hypot(p.x - f.x, p.y - f.y) < radius) {
                 p.mass += 1;
-                gameState.foods[i] = {
-                    id: Math.random(),
-                    x: Math.random() * WORLD_SIZE,
-                    y: Math.random() * WORLD_SIZE,
-                    color: `hsl(${Math.random() * 360}, 80%, 50%)`
-                };
+                gameState.foods[i] = createFood();
             }
         }
     });
 
-    // 廣播給所有 Client
-    Object.values(connections).forEach(conn => {
-        conn.send({ type: 'STATE', state: gameState });
-    });
-}
-
-// 操作事件監聽 (電腦 + 手機)
-let mouseX = 0, mouseY = 0;
-window.addEventListener('mousemove', (e) => {
-    let centerX = canvas.width / 2;
-    let centerY = canvas.height / 2;
-    localInput.angle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
-    localInput.speed = 1;
-    sendInput();
-});
-
-// 觸控搖桿實作
-const joyZone = document.getElementById('joystick-zone');
-const joyKnob = document.getElementById('joystick-knob');
-let joyActive = false;
-
-joyZone.addEventListener('touchstart', handleJoy);
-joyZone.addEventListener('touchmove', handleJoy);
-joyZone.addEventListener('touchend', () => {
-    joyKnob.style.transform = `translate(0px, 0px)`;
-    localInput.speed = 0;
-    sendInput();
-});
-
-function handleJoy(e) {
-    e.preventDefault();
-    let rect = joyZone.getBoundingClientRect();
-    let touch = e.touches[0];
-    let dx = touch.clientX - (rect.left + rect.width / 2);
-    let dy = touch.clientY - (rect.top + rect.height / 2);
-    let dist = Math.hypot(dx, dy);
-    let maxDist = rect.width / 2;
-
-    let angle = Math.atan2(dy, dx);
-    let limitDist = Math.min(dist, maxDist);
-
-    joyKnob.style.transform = `translate(${Math.cos(angle) * limitDist}px, ${Math.sin(angle) * limitDist}px)`;
-    localInput.angle = angle;
-    localInput.speed = limitDist / maxDist;
-    sendInput();
-}
-
-function sendInput() {
-    if (!isHost && hostConn && hostConn.open) {
-        hostConn.send({ type: 'INPUT', input: localInput });
+    // 廣播最新世界狀態
+    if (peer && peer.connections) {
+        Object.keys(peer.connections).forEach(pId => {
+            peer.connections[pId][0].send({ type: 'STATE', state: gameState });
+        });
     }
 }
 
-// 繪製與渲染引擎 (60 FPS)
+// --- [4. 繪製引擎：解決正圓與 DPI 適應] ---
 function render() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    let myPlayer = gameState.players[myId];
-    if (myPlayer) {
-        document.getElementById('mass-val').innerText = Math.floor(myPlayer.mass);
-
+    let me = gameState.players[myId];
+    if (me) {
         ctx.save();
-        // 攝影機跟隨玩家
-        ctx.translate(canvas.width / 2 - myPlayer.x, canvas.height / 2 - myPlayer.y);
+        
+        // **高畫質正圓核心計算**：利用 dpr 進行矩陣縮放
+        let radius = Math.sqrt(me.mass) * 8;
+        ctx.scale(dpr, dpr);
+        ctx.translate(window.innerWidth / 2 - me.x, window.innerHeight / 2 - me.y);
 
-        // 畫網格世界背景
-        ctx.strokeStyle = '#222';
-        ctx.lineWidth = 2;
-        for (let x = 0; x <= WORLD_SIZE; x += 100) {
+        // 網格背景
+        ctx.strokeStyle = '#1a2233'; ctx.lineWidth = 1;
+        for (let x = 0; x <= WORLD_SIZE; x += 80) {
             ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD_SIZE); ctx.stroke();
         }
-        for (let y = 0; y <= WORLD_SIZE; y += 100) {
-            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD_SIZE, y); ctx.stroke();
+        for (let y = 0; y <= WORLD_SIZE; y += 80) {
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(0, WORLD_SIZE); ctx.stroke();
         }
 
-        // 畫食物
+        // 食物繪製
         gameState.foods.forEach(f => {
             ctx.fillStyle = f.color;
-            ctx.beginPath(); ctx.arc(f.x, f.y, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath();
+            ctx.arc(f.x, f.y, 4, 0, Math.PI * 2); // 絕對正圓
+            ctx.fill();
         });
 
-        // 畫玩家（棉被風格外觀）
+        // 刺球繪製
+        gameState.viruses.forEach(v => {
+            ctx.fillStyle = '#33ff33';
+            ctx.beginPath();
+            ctx.arc(v.x, v.y, v.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#22cc22'; ctx.lineWidth = 4; ctx.stroke();
+        });
+
+        // 玩家繪製
         Object.values(gameState.players).forEach(p => {
             let r = Math.sqrt(p.mass) * 8;
-            
-            // 本體球體
-            ctx.fillStyle = p.color;
-            ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
-            ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
 
-            // 暱稱與棉被家族標示
-            ctx.fillStyle = '#fff';
-            ctx.font = `bold ${Math.max(12, r * 0.4)}px sans-serif`;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, r, 0, Math.PI * 2); // 保證正圓
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.stroke();
+
+            // 暱稱繪製
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${Math.max(12, r * 0.35)}px sans-serif`;
             ctx.textAlign = 'center';
-            ctx.fillText(`[棉被] ${p.name}`, p.x, p.y + 4);
+            ctx.fillText(p.name, p.x, p.y + (r * 0.1));
         });
 
         ctx.restore();
@@ -281,10 +305,43 @@ function render() {
 
     requestAnimationFrame(render);
 }
-
-// 啟動專案
-initP2P();
 requestAnimationFrame(render);
+
+// --- [5. 操作控制 (電腦 + 手機)] ---
+window.addEventListener('mousemove', (e) => {
+    if (isMobile) return;
+    let centerX = window.innerWidth / 2;
+    let centerY = window.innerHeight / 2;
+    localInput.angle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
+    localInput.speed = 1;
+    sendInputToServer();
+});
+
+// 手機搖桿監聽
+const joyZone = document.getElementById('joystick-zone');
+const joyKnob = document.getElementById('joystick-knob');
+joyZone.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    let rect = joyZone.getBoundingClientRect();
+    let touch = e.touches[0];
+    let dx = touch.clientX - (rect.left + rect.width / 2);
+    let dy = touch.clientY - (rect.top + rect.height / 2);
+    let dist = Math.hypot(dx, dy);
+    let maxDist = rect.width / 2;
+    let angle = Math.atan2(dy, dx);
+    let limitDist = Math.min(dist, maxDist);
+
+    joyKnob.style.transform = `translate(${Math.cos(angle)*limitDist}px, ${Math.sin(angle)*limitDist}px)`;
+    localInput.angle = angle;
+    localInput.speed = limitDist / maxDist;
+    sendInputToServer();
+});
+
+function sendInputToServer() {
+    if (!isHost && conn && conn.open) {
+        conn.send({ type: 'INPUT', input: localInput });
+    }
+}
 </script>
 </body>
 </html>
