@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>FR.io - Fixed Edition</title>
+    <title>FR.io - Fixed & Optimized Edition</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; touch-action: none; }
         body, html { width: 100%; height: 100%; overflow: hidden; background: #080a14; font-family: 'Segoe UI', Arial, sans-serif; position: fixed; }
@@ -110,7 +110,7 @@ document.addEventListener('touchmove', e => e.preventDefault(), { passive: false
 const GAME_SIG = "FR_IO_SECURE_AUTH_2026";
 const WORLD_SIZE = 4000;
 const PADDING = 60;
-const RADIUS_SCALE = 3.8; // 修正半徑比率
+const RADIUS_SCALE = 3.8;
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -145,6 +145,7 @@ let myId = 'peer_' + Math.random().toString(36).substring(2, 9);
 
 let gameState = { players: {}, foods: [], viruses: [], ejected: [] };
 let localInput = { angle: 0, speed: 0, split: false, eject: false };
+let lastSendTime = 0;
 
 function startGame() {
     myName = document.getElementById('nickname').value.trim() || "無名玩家";
@@ -349,19 +350,21 @@ function updateHostLogic() {
                 }
             }
 
+            // 修正：病毒拆分質量計算修正
             for (let i = 0; i < gameState.viruses.length; i++) {
                 let v = gameState.viruses[i];
                 if (cell.mass > v.radius && Math.hypot(cell.x - v.x, cell.y - v.y) < radius) {
                     let maxAllowed = 16 - p.cells.length;
                     if (maxAllowed > 0) {
-                        let pieces = Math.min(maxAllowed + 1, Math.floor(cell.mass / 20));
-                        if (pieces > 1) {
-                            cell.mass /= pieces;
-                            for (let k = 1; k < pieces; k++) {
-                                let a = (Math.PI * 2 / pieces) * k;
+                        let targetPieces = Math.min(maxAllowed + 1, Math.floor(cell.mass / 20));
+                        if (targetPieces > 1) {
+                            let splitMass = cell.mass / targetPieces;
+                            cell.mass = splitMass;
+                            for (let k = 1; k < targetPieces; k++) {
+                                let a = (Math.PI * 2 / targetPieces) * k;
                                 p.cells.push({
                                     x: cell.x, y: cell.y, renderX: cell.x, renderY: cell.y,
-                                    mass: cell.mass, vx: Math.cos(a) * 18, vy: Math.sin(a) * 18,
+                                    mass: splitMass, vx: Math.cos(a) * 18, vy: Math.sin(a) * 18,
                                     splitTime: now
                                 });
                             }
@@ -398,10 +401,12 @@ function updateHostLogic() {
     });
 
     gameState.ejected.forEach(e => {
-        if (e.speed > 0) {
+        if (e.speed > 0.1) {
             e.x += Math.cos(e.angle) * e.speed;
             e.y += Math.sin(e.angle) * e.speed;
             e.speed *= 0.88;
+        } else {
+            e.speed = 0;
         }
     });
 
@@ -414,7 +419,7 @@ function updateHostLogic() {
             p1.cells.forEach(c1 => {
                 for (let k = p2.cells.length - 1; k >= 0; k--) {
                     let c2 = p2.cells[k];
-                    if (c1.mass >= c2.mass * 1.15) { // 需比對方大 15% 才能吃
+                    if (c1.mass >= c2.mass * 1.15) {
                         let r1 = Math.sqrt(c1.mass) * RADIUS_SCALE;
                         if (Math.hypot(c1.x - c2.x, c1.y - c2.y) < r1 - 5) {
                             c1.mass += c2.mass;
@@ -426,7 +431,9 @@ function updateHostLogic() {
             });
 
             if (p2.cells.length === 0) {
-                if (p2.id === myId) triggerGameOver(p2.lastScore || 0);
+                if (p2.id === myId && document.getElementById('gameover').style.display !== 'flex') {
+                    triggerGameOver(p2.lastScore || 0);
+                }
                 delete gameState.players[p2.id];
             } else {
                 p2.lastScore = p2.cells.reduce((sum, c) => sum + c.mass, 0);
@@ -434,7 +441,6 @@ function updateHostLogic() {
         }
     }
 
-    // 廣播修正：遍歷所有 Channel 避免 Host 死鎖
     if (peer && peer.connections) {
         Object.keys(peer.connections).forEach(pId => {
             peer.connections[pId].forEach(c => {
@@ -570,7 +576,6 @@ function render() {
 }
 requestAnimationFrame(render);
 
-// 修正：計算世界座標下的瞄準角度
 window.addEventListener('mousemove', (e) => {
     mousePos.x = e.clientX;
     mousePos.y = e.clientY;
@@ -589,9 +594,8 @@ window.addEventListener('mousemove', (e) => {
 });
 
 window.addEventListener('keydown', (e) => {
-    if (e.code === 'KeyW') localInput.eject = true;
-    if (e.code === 'Space') localInput.split = true;
-    sendInput();
+    if (e.code === 'KeyW') { localInput.eject = true; sendInput(true); }
+    if (e.code === 'Space') { localInput.split = true; sendInput(true); }
 });
 
 const joyZone = document.getElementById('joystick-zone');
@@ -632,7 +636,7 @@ function resetJoystick(e) {
             joyTouchId = null;
             joyKnob.style.transform = `translate(0px, 0px)`;
             localInput.speed = 0;
-            sendInput();
+            sendInput(true);
             break;
         }
     }
@@ -640,11 +644,18 @@ function resetJoystick(e) {
 joyZone.addEventListener('touchend', resetJoystick);
 joyZone.addEventListener('touchcancel', resetJoystick);
 
-document.getElementById('btn-w').addEventListener('touchstart', (e) => { e.preventDefault(); localInput.eject = true; sendInput(); });
-document.getElementById('btn-space').addEventListener('touchstart', (e) => { e.preventDefault(); localInput.split = true; sendInput(); });
+document.getElementById('btn-w').addEventListener('touchstart', (e) => { e.preventDefault(); localInput.eject = true; sendInput(true); });
+document.getElementById('btn-space').addEventListener('touchstart', (e) => { e.preventDefault(); localInput.split = true; sendInput(true); });
 
-function sendInput() {
-    if (!isHost && conn && conn.open) conn.send({ type: 'INPUT', input: localInput });
+// 修正：發送頻率限制 (Throttle)，避免過度傳輸塞爆 WebRTC 緩衝區
+function sendInput(force = false) {
+    const now = Date.now();
+    if (force || now - lastSendTime > 33) { // 限制最快每秒約 30 次發送
+        if (!isHost && conn && conn.open) {
+            conn.send({ type: 'INPUT', input: localInput });
+            lastSendTime = now;
+        }
+    }
 }
 </script>
 </body>
